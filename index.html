@@ -3,55 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pro Flipbook Generator</title>
+<title>Pro Flipbook</title>
 
-<!-- PDF.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 
-<!-- jQuery + Turn.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/4.1.0/turn.min.js"></script>
-
 <style>
-body{
-    margin:0;
-    background:#111;
-    color:white;
-    font-family:Arial;
-    text-align:center;
-}
-h2{margin:15px;}
-#controls{margin:10px;}
-#book{
-    width:95%;
-    height:80vh;
-    margin:auto;
-}
+body{margin:0;background:#111;color:white;text-align:center;font-family:Arial}
+#book{width:100%;height:90vh;position:relative;overflow:hidden}
 .page{
-    width:100%;
-    height:100%;
+position:absolute;
+width:100%;
+height:100%;
+transition:transform 1s;
+transform-origin:left;
+backface-visibility:hidden;
 }
-.page img{
-    width:100%;
-    height:100%;
-    object-fit:contain;
-}
-button{
-    padding:10px 20px;
-    margin:5px;
-    font-size:16px;
-}
+.page img{width:100%;height:100%;object-fit:contain}
+button{padding:10px 20px;margin:10px;font-size:16px}
 </style>
 </head>
 
 <body>
 
-<h2>📖 Pro Flipbook Generator</h2>
+<h2>📖 Flipbook Generator</h2>
 
-<div id="controls">
 <input type="file" id="upload" accept="application/pdf">
-<button id="downloadBtn" disabled>Download Offline Book</button>
-</div>
+<button onclick="downloadBook()">Download Offline Book</button>
 
 <div id="book"></div>
 
@@ -60,12 +37,14 @@ button{
 pdfjsLib.GlobalWorkerOptions.workerSrc =
 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-let images=[];
+let pages=[];
+let current=0;
 
-document.getElementById("upload").addEventListener("change", function(e){
+document.getElementById("upload").addEventListener("change",function(e){
 
-images=[];
-$("#book").html("").turn && $("#book").turn("destroy");
+pages=[];
+current=0;
+document.getElementById("book").innerHTML="";
 
 const file=e.target.files[0];
 const reader=new FileReader();
@@ -75,10 +54,7 @@ const typedarray=new Uint8Array(this.result);
 
 pdfjsLib.getDocument(typedarray).promise.then(function(pdf){
 
-let total=pdf.numPages;
-let rendered=0;
-
-for(let i=1;i<=total;i++){
+for(let i=1;i<=pdf.numPages;i++){
 
 pdf.getPage(i).then(function(page){
 
@@ -91,30 +67,17 @@ canvas.height=viewport.height;
 
 page.render({canvasContext:ctx,viewport:viewport}).promise.then(function(){
 
-let imgData=canvas.toDataURL("image/jpeg",0.7);
-images.push(imgData);
+let img=canvas.toDataURL("image/jpeg",0.8);
+pages.push(img);
 
-rendered++;
-
-if(rendered===total){
-
-images.sort((a,b)=>0); // keep order
-
-images.forEach(img=>{
-$("#book").append(`<div class="page"><img src="${img}"></div>`);
-});
-
-$("#book").turn({
-width:$("#book").width(),
-height:$("#book").height(),
-autoCenter:true
-});
-
-document.getElementById("downloadBtn").disabled=false;
-
-}
+let div=document.createElement("div");
+div.className="page";
+div.style.zIndex=1000-i;
+div.innerHTML="<img src='"+img+"'>";
+document.getElementById("book").appendChild(div);
 
 });
+
 });
 }
 
@@ -125,29 +88,43 @@ reader.readAsArrayBuffer(file);
 
 });
 
-document.getElementById("downloadBtn").addEventListener("click",function(){
+document.getElementById("book").addEventListener("click",function(){
+let all=document.querySelectorAll(".page");
+if(current<all.length){
+all[current].style.transform="rotateY(-180deg)";
+current++;
+}
+});
+
+function downloadBook(){
 
 let html=`<!DOCTYPE html><html><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flipbook</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"><\/script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/4.1.0/turn.min.js"><\/script>
 <style>
-body{margin:0;background:#111;}
-#book{width:100vw;height:100vh;}
-.page img{width:100%;height:100%;object-fit:contain;}
+body{margin:0;background:#111}
+#book{width:100vw;height:100vh;position:relative}
+.page{position:absolute;width:100%;height:100%;transition:transform 1s;transform-origin:left}
+.page img{width:100%;height:100%;object-fit:contain}
 <\/style>
 <\/head><body>
 <div id="book">`;
 
-images.forEach(img=>{
-html+=`<div class="page"><img src="${img}"></div>`;
+pages.forEach((img,i)=>{
+html+=`<div class="page" style="z-index:${1000-i}"><img src="${img}"></div>`;
 });
 
 html+=`</div>
 <script>
-$("#book").turn({autoCenter:true});
+let current=0;
+document.getElementById("book").addEventListener("click",function(){
+let all=document.querySelectorAll(".page");
+if(current<all.length){
+all[current].style.transform="rotateY(-180deg)";
+current++;
+}
+});
 <\/script>
 <\/body><\/html>`;
 
@@ -157,7 +134,7 @@ a.href=URL.createObjectURL(blob);
 a.download="Flipbook.html";
 a.click();
 
-});
+}
 
 </script>
 
