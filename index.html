@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro Flipbook Generator</title>
+
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+<!-- jQuery + Turn.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/4.1.0/turn.min.js"></script>
+
+<style>
+body{
+    margin:0;
+    background:#111;
+    color:white;
+    font-family:Arial;
+    text-align:center;
+}
+h2{margin:15px;}
+#controls{margin:10px;}
+#book{
+    width:95%;
+    height:80vh;
+    margin:auto;
+}
+.page{
+    width:100%;
+    height:100%;
+}
+.page img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+}
+button{
+    padding:10px 20px;
+    margin:5px;
+    font-size:16px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>📖 Pro Flipbook Generator</h2>
+
+<div id="controls">
+<input type="file" id="upload" accept="application/pdf">
+<button id="downloadBtn" disabled>Download Offline Book</button>
+</div>
+
+<div id="book"></div>
+
+<script>
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+let images=[];
+
+document.getElementById("upload").addEventListener("change", function(e){
+
+images=[];
+$("#book").html("").turn && $("#book").turn("destroy");
+
+const file=e.target.files[0];
+const reader=new FileReader();
+
+reader.onload=function(){
+const typedarray=new Uint8Array(this.result);
+
+pdfjsLib.getDocument(typedarray).promise.then(function(pdf){
+
+let total=pdf.numPages;
+let rendered=0;
+
+for(let i=1;i<=total;i++){
+
+pdf.getPage(i).then(function(page){
+
+const viewport=page.getViewport({scale:1.5});
+const canvas=document.createElement("canvas");
+const ctx=canvas.getContext("2d");
+
+canvas.width=viewport.width;
+canvas.height=viewport.height;
+
+page.render({canvasContext:ctx,viewport:viewport}).promise.then(function(){
+
+let imgData=canvas.toDataURL("image/jpeg",0.7);
+images.push(imgData);
+
+rendered++;
+
+if(rendered===total){
+
+images.sort((a,b)=>0); // keep order
+
+images.forEach(img=>{
+$("#book").append(`<div class="page"><img src="${img}"></div>`);
+});
+
+$("#book").turn({
+width:$("#book").width(),
+height:$("#book").height(),
+autoCenter:true
+});
+
+document.getElementById("downloadBtn").disabled=false;
+
+}
+
+});
+});
+}
+
+});
+};
+
+reader.readAsArrayBuffer(file);
+
+});
+
+document.getElementById("downloadBtn").addEventListener("click",function(){
+
+let html=`<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flipbook</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"><\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/4.1.0/turn.min.js"><\/script>
+<style>
+body{margin:0;background:#111;}
+#book{width:100vw;height:100vh;}
+.page img{width:100%;height:100%;object-fit:contain;}
+<\/style>
+<\/head><body>
+<div id="book">`;
+
+images.forEach(img=>{
+html+=`<div class="page"><img src="${img}"></div>`;
+});
+
+html+=`</div>
+<script>
+$("#book").turn({autoCenter:true});
+<\/script>
+<\/body><\/html>`;
+
+let blob=new Blob([html],{type:"text/html"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="Flipbook.html";
+a.click();
+
+});
+
+</script>
+
+</body>
+</html>
